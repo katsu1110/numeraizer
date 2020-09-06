@@ -23,21 +23,24 @@ OUTPUT_DIR = ''
 
 public_id = 'ABCDEF'
 secret_key = 'ABCDEF'
+PREDICTION_NAME = "prediction_kazutsugi"
 
 # -----------------------------
 # Function
 # -----------------------------
 def submit(tournament : pd.DataFrame, pred : np.ndarray, model_id='abcde'):
     predictions_df = tournament["id"].to_frame()
-    predictions_df["prediction_kazutsugi"] = pred
+    predictions_df[PREDICTION_NAME] = pred
     
-    # scaling
-    predictions_df["prediction_kazutsugi"] = (predictions_df["prediction_kazutsugi"] - predictions_df["prediction_kazutsugi"].min()) / (predictions_df["prediction_kazutsugi"].max() - predictions_df["prediction_kazutsugi"].min())
-        
-    # use API
-    napi = numerapi.NumerAPI(public_id=public_id, secret_key=secret_key)
+    # to rank
+    predictions_df[PREDICTION_NAME] = predictions_df[PREDICTION_NAME].rank(pct=True, method="first")
     
-    # Upload your predictions
+    # save
     predictions_df.to_csv(pathlib.Path(OUTPUT_DIR + f"predictions_{model_id}.csv"), index=False)
+    
+    # Upload your predictions using API
+    napi = numerapi.NumerAPI(public_id=public_id, secret_key=secret_key)
     submission_id = napi.upload_predictions(pathlib.Path(OUTPUT_DIR + f"predictions_{model_id}.csv"), model_id=model_id)
     logger.debug('submitted to {model_id}', model_id=model_id)
+    
+    return predictions_df
