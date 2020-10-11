@@ -19,15 +19,15 @@ from loguru import logger
 # -----------------------------
 
 NUMERAI_DATA = 'https://numerai-public-datasets.s3-us-west-2.amazonaws.com/'
-INPUT_DIR = '/kaggle/input/numerai-train-to-feather-noeda/'
+INPUT_DIR = '../input/'
 
 # -----------------------------
 # Function
 # -----------------------------
-def download_data(data='train'):
+def download_data(data='train', save=True):
     if data == 'train':
         fname = 'latest_numerai_training_data.csv.xz'
-    else:
+    elif data in ['test', 'tournament']:
         fname = 'latest_numerai_tournament_data.csv.xz'
     df = pd.read_csv(pathlib.Path(NUMERAI_DATA + fname)) 
     feature_cols = df.columns[df.columns.str.startswith('feature')]
@@ -35,6 +35,10 @@ def download_data(data='train'):
     for c in feature_cols:
         df[c] = df[c].map(mapping).astype(np.uint8)
     logger.debug('Downloaded {} data shape: {}'.format(data, df.shape))
+    if save:
+        save_path = pathlib.Path(INPUT_DIR + data + '.feather')
+        df.to_feather(save_path)
+        logger.debug('Downloaded {} data saved to {}'.format(data, save_path))
     return df
 
 def get_int(x):
@@ -46,8 +50,11 @@ def get_int(x):
 def load_data():
     # load data
     train = pd.read_feather(pathlib.Path(INPUT_DIR + 'train.feather'))
-    tournament = pd.read_feather(pathlib.Path(INPUT_DIR + 'test.feather'))
-    
+    try:
+        tournament = pd.read_feather(pathlib.Path(INPUT_DIR + 'test.feather'))
+    except:
+        tournament = pd.read_feather(pathlib.Path(INPUT_DIR + 'tournament.feather'))
+
     # split valid and test
     valid = tournament[tournament["data_type"] == "validation"].reset_index(drop = True)
     
