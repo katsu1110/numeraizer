@@ -14,8 +14,6 @@ from loguru import logger
 # Config
 # ---------------------------
 INPUT_DIR = '../input/'
-INPUT_TRAIN_DIR = '../input/numerai-train-to-feather-noeda/'
-INPUT_TEST_DIR = '../input/numerai-test-to-feather-noeda/'
 OUTPUT_DIR = ''
 
 # naming conventions
