@@ -21,9 +21,9 @@ from loguru import logger
 
 OUTPUT_DIR = ''
 
-public_id = 'ABCDEF'
-secret_key = 'ABCDEF'
-PREDICTION_NAME = "prediction_kazutsugi"
+public_id = 'ABCDEF' # replace with yours
+secret_key = 'ABCDEF' # replace with yours
+PREDICTION_NAME = "prediction_kazutsugi" # will be 'prediction_nomi' in the future
 
 # -----------------------------
 # Function
