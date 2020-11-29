@@ -15,16 +15,17 @@ from loguru import logger
 # ---------------------------
 INPUT_DIR = '../input/'
 OUTPUT_DIR = ''
+EXP_DIR = ''
 
 # naming conventions
 PREDICTION_NAME = 'prediction'
-TARGET_NAME = 'target_kazutsugi' # will be 'target_nomi' in the future
+TARGET_NAME = 'target' # will be 'target_nomi' in the future
 EXAMPLE_PRED = 'example_prediction'
 
 # ---------------------------
 # Functions
 # ---------------------------
-def valid4score(valid : pd.DataFrame, pred : np.ndarray, load_example: bool=False, save : bool=False) -> pd.DataFrame:
+def valid4score(valid : pd.DataFrame, pred : np.ndarray, load_example: bool=True, save : bool=False) -> pd.DataFrame:
     """
     Generate new valid pandas dataframe for computing scores
     
@@ -34,9 +35,10 @@ def valid4score(valid : pd.DataFrame, pred : np.ndarray, load_example: bool=Fals
     """
     valid_df = valid.copy()
     valid_df['prediction'] = pd.Series(pred).rank(pct=True, method="first")
+    valid_df.rename(columns={TARGET_NAME: 'target'}, inplace=True)
     
     if load_example:
-        valid_df[EXAMPLE_PRED] = pd.read_csv(INPUT_DIR + 'numerai-example/valid_df.csv')['prediction'].values
+        valid_df[EXAMPLE_PRED] = pd.read_csv(EXP_DIR + 'valid_df.csv')['prediction'].values
     
     if save==True:
         valid_df.to_csv(OUTPUT_DIR + 'valid_df.csv', index=False)
@@ -53,7 +55,7 @@ def compute_corr(valid_df : pd.DataFrame):
     
     """
     
-    return np.corrcoef(valid_df[TARGET_NAME], valid_df['prediction'])[0, 1]
+    return np.corrcoef(valid_df["target"], valid_df['prediction'])[0, 1]
 
 def compute_max_drawdown(validation_correlations : pd.Series):
     """
@@ -79,18 +81,8 @@ def compute_val_corr(valid_df : pd.DataFrame):
     
     # all validation
     correlation = compute_corr(valid_df)
-    logger.debug("ALL VALID: rank corr = {:.4f}".format(correlation))
-
-    # first valid eras
-    if 'valid2' in valid_df.columns.values.tolist():
-        idx = np.where(valid_df["valid2"] == False)[0]
-        correlation = compute_corr(valid_df.iloc[idx])
-        logger.debug("VALID 1: rank corr = {:.4f}".format(correlation))
-
-        # second valid eras
-        idx = np.where(valid_df["valid2"] == True)[0]
-        correlation = compute_corr(valid_df.iloc[idx])
-        logger.debug("VALID 2: rank corr = {:.4f}".format(correlation))
+    logger.debug("rank corr = {:.4f}".format(correlation))
+    return correlation
     
 def compute_val_sharpe(valid_df : pd.DataFrame):
     """
@@ -100,28 +92,13 @@ def compute_val_sharpe(valid_df : pd.DataFrame):
     - valid_df : pd.DataFrame where at least 2 columns ('prediction' & 'target') exist
     """
     # all validation
-    d = valid_df.groupby('era')[[TARGET_NAME, 'prediction']].corr().iloc[0::2,-1].reset_index()
+    d = valid_df.groupby('era')[['target', 'prediction']].corr().iloc[0::2,-1].reset_index()
     me = d['prediction'].mean()
     sd = d['prediction'].std()
     max_drawdown = compute_max_drawdown(d['prediction'])
-    logger.debug('ALL VALID: sharpe ratio = {:.4f}, corr mean = {:.4f}, corr std = {:.4f}, max drawdown = {:.4f}'.format(me / sd, me, sd, max_drawdown))
+    logger.debug('sharpe ratio = {:.4f}, corr mean = {:.4f}, corr std = {:.4f}, max drawdown = {:.4f}'.format(me / sd, me, sd, max_drawdown))
     
-    if "valid2" in valid_df.columns.values.tolist():
-        # first valid eras
-        idx = np.where(valid_df["valid2"] == False)[0]
-        d = valid_df.iloc[idx].groupby('era')[[TARGET_NAME, 'prediction']].corr().iloc[0::2,-1].reset_index()
-        me = d['prediction'].mean()
-        sd = d['prediction'].std()
-        max_drawdown = compute_max_drawdown(d['prediction'])
-        logger.debug('VALID 1: sharpe ratio = {:.4f}, corr mean = {:.4f}, corr std = {:.4f}, max drawdown = {:.4f}'.format(me / sd, me, sd, max_drawdown))
-        
-        # second valid eras
-        idx = np.where(valid_df["valid2"] == True)[0]
-        d = valid_df.iloc[idx].groupby('era')[[TARGET_NAME, 'prediction']].corr().iloc[0::2,-1].reset_index()
-        me = d['prediction'].mean()
-        sd = d['prediction'].std()
-        max_drawdown = compute_max_drawdown(d['prediction'])
-        logger.debug('VALID 2: sharpe ratio = {:.4f}, corr mean = {:.4f}, corr std = {:.4f}, max drawdown = {:.4f}'.format(me / sd, me, sd, max_drawdown))
+    return me / sd, me, sd, max_drawdown
     
 def feature_exposures(valid_df : pd.DataFrame):
     """
@@ -130,7 +107,8 @@ def feature_exposures(valid_df : pd.DataFrame):
     :INPUT:
     - valid_df : pd.DataFrame where at least 2 columns ('prediction' & 'target') exist
     """
-    feature_names = [f for f in valid_df.columns if f.startswith("feature")]
+    feature_names = [f for f in valid_df.columns
+                     if f.startswith("feature")]
     exposures = []
     for f in feature_names:
         fe = spearmanr(valid_df['prediction'], valid_df[f])[0]
@@ -152,19 +130,11 @@ def compute_val_feature_exposure(valid_df : pd.DataFrame):
     """
     # all validation
     fe = feature_exposures(valid_df)
-    logger.debug('ALL VALID: feature exposure = {:.4f}, max feature exposure = {:.4f}'.format(feature_exposure(fe), max_feature_exposure(fe)))
-    
-    if "valid2" in valid_df.columns.values.tolist():
-        # first valid eras
-        idx = np.where(valid_df["valid2"] == False)[0]
-        fe = feature_exposures(valid_df.iloc[idx])
-        logger.debug('VALID 1: feature exposure = {:.4f}, max feature exposure = {:.4f}'.format(feature_exposure(fe), max_feature_exposure(fe)))
-        
-        # second valid eras
-        idx = np.where(valid_df["valid2"] == True)[0]
-        fe = feature_exposures(valid_df.iloc[idx])
-        logger.debug('VALID 2: feature exposure = {:.4f}, max feature exposure = {:.4f}'.format(feature_exposure(fe), max_feature_exposure(fe)))
-    
+    fe1, fe2 = feature_exposure(fe), max_feature_exposure(fe)
+    logger.debug('feature exposure = {:.4f}, max feature exposure = {:.4f}'.format(fe1, fe2))
+     
+    return fe1, fe2
+
 # to neutralize a column in a df by many other columns
 def neutralize(df, columns, by, proportion=1.0):
     scores = df.loc[:, columns]
@@ -179,6 +149,7 @@ def neutralize(df, columns, by, proportion=1.0):
         np.linalg.pinv(exposures).dot(scores))
     return scores / scores.std()
 
+
 # to neutralize any series by any other series
 def neutralize_series(series, by, proportion=1.0):
     scores = series.values.reshape(-1, 1)
@@ -186,7 +157,8 @@ def neutralize_series(series, by, proportion=1.0):
 
     # this line makes series neutral to a constant column so that it's centered and for sure gets corr 0 with exposures
     exposures = np.hstack(
-        (exposures, np.array([np.mean(series)] * len(exposures)).reshape(-1, 1)))
+        (exposures,
+         np.array([np.mean(series)] * len(exposures)).reshape(-1, 1)))
 
     correction = proportion * (exposures.dot(
         np.linalg.lstsq(exposures, scores, rcond=None)[0]))
@@ -194,13 +166,15 @@ def neutralize_series(series, by, proportion=1.0):
     neutralized = pd.Series(corrected_scores.ravel(), index=series.index)
     return neutralized
 
+
 def unif(df):
     x = (df.rank(method="first") - 0.5) / len(df)
     return pd.Series(x, index=df.index)
 
 def get_feature_neutral_mean(df):
     feature_cols = [c for c in df.columns if c.startswith("feature")]
-    df.loc[:, "neutral_sub"] = neutralize(df, [PREDICTION_NAME], feature_cols)[PREDICTION_NAME]
+    df.loc[:, "neutral_sub"] = neutralize(df, [PREDICTION_NAME],
+                                          feature_cols)[PREDICTION_NAME]
     scores = df.groupby("era").apply(
         lambda x: np.corrcoef(x["neutral_sub"].rank(pct=True, method="first"), x[TARGET_NAME])).mean()
     return np.mean(scores)
@@ -228,3 +202,27 @@ def compute_val_mmc(valid_df : pd.DataFrame):
     corr_with_example_preds = np.corrcoef(valid_df[EXAMPLE_PRED].rank(pct=True, method="first"),
                                           valid_df[PREDICTION_NAME].rank(pct=True, method="first"))[0, 1]
     logger.debug("Corr with example preds: {:.4f}".format(corr_with_example_preds))
+    
+    return val_mmc_mean, val_mmc_std, corr_plus_mmc_sharpe, corr_with_example_preds
+    
+def score_summary(valid_df : pd.DataFrame):
+    score_df = {}
+    
+    try:
+        score_df['correlation'] = compute_val_corr(valid_df)
+    except:
+        print('ERR: computing correlation')
+    try:
+        score_df['corr_sharpe'], score_df['corr_mean'], score_df['corr_std'], score_df['max_drawdown'] = compute_val_sharpe(valid_df)
+    except:
+        print('ERR: computing sharpe')
+    try:
+        score_df['feature_exposure'], score_df['max_feature_exposure'] = compute_val_feature_exposure(valid_df)
+    except:
+        print('ERR: computing feature exposure')
+    try:
+        score_df['mmc_mean'], score_df['mmc_std'], score_df['corr_mmc_sharpe'], score_df['corr_with_example_xgb'] = compute_val_mmc(valid_df)
+    except:
+        print('ERR: computing MMC')
+    
+    return pd.DataFrame.from_dict(score_df, orient='index')

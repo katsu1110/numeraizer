@@ -68,11 +68,4 @@ def load_data():
     valid["era"] = valid["era"].apply(get_int)
     tournament["era"] = tournament["era"].apply(get_int)
 
-    # validation split
-    valid.loc[valid["era"] > 180, "valid2"] = True
-    valid.loc[valid["era"] <= 180, "valid2"] = False
-
-    tournament.loc[tournament["era"] > 853, "test2"] = True
-    tournament.loc[tournament["era"] <= 853, "test2"] = False
-
     return train, valid, tournament
