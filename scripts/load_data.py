@@ -1,7 +1,7 @@
 """
 Assuming 
 
-!pip install numerapi
+!pip install numerapi==2.4.5
 
 has been already done.
 """
@@ -12,7 +12,7 @@ import pandas as pd
 import os
 import sys
 import pathlib
-from loguru import logger
+import glob
 
 # -----------------------------
 # Config
