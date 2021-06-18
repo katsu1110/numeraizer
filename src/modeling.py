@@ -45,7 +45,7 @@ class Modeling:
     val_df = df.query('data_type == "validation"')
     model.fit(train_df, val_df, early_stop=500)
 
-    # save model
+    # save model (saved as .pkl)
     model.save('mymodel')
 
     # get feature importance
