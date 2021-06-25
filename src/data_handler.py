@@ -18,7 +18,11 @@ class NumeraiDataHandler:
         self.output_dir = output_dir
 
     @classmethod
-    def fetch_data(cls, data_type='train'):
+    def fetch_data(cls, data_type: str='train', map_to_int: bool=True):
+        """
+        fetch Numerai Tournament data from the website and make it lighter
+        """
+
         # fetch data
         if data_type.lower() == 'train':
             url = cls.train_path
@@ -27,10 +31,11 @@ class NumeraiDataHandler:
         df = pd.read_csv(url)
 
         # cast to uint8 to reduce memory demand
-        feature_cols = df.columns[df.columns.str.startswith('feature')]
-        mapping = {0.0 : 0, 0.25 : 1, 0.5 : 2, 0.75 : 3, 1.0 : 4}
-        for c in feature_cols:
-            df[c] = df[c].map(mapping).astype(np.uint8)
+        if map_to_int:
+            feature_cols = df.columns[df.columns.str.startswith('feature')]
+            mapping = {0.0 : 0, 0.25 : 1, 0.5 : 2, 0.75 : 3, 1.0 : 4}
+            for c in feature_cols:
+                df[c] = df[c].map(mapping).astype(np.uint8)
         
         # also cast era to int
         def get_int(x):

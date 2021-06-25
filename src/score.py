@@ -243,6 +243,31 @@ class TournamentScoring:
         
         return val_mmc_mean, val_mmc_std, corr_plus_mmc_sharpe, corr_with_example_preds
         
+    def calculate_fnc(self):
+        """    
+        compute feature neutral correlation
+        https://docs.numer.ai/tournament/feature-neutral-correlation
+        """
+        # necessary vectors
+        sub = self.valid_df[self.pred_name]
+        features = self.valid_df[self.features]
+        targets = self.valid_df[self.target_name]
+
+        # Normalize submission
+        sub = (sub.rank(method="first").values - 0.5) / len(sub)
+
+        # Neutralize submission to features
+        f = features.values
+        sub -= f.dot(np.linalg.pinv(f).dot(sub))
+        sub /= sub.std()
+        
+        sub = pd.Series(np.squeeze(sub)) # Convert np.ndarray to pd.Series
+
+        # FNC: Spearman rank-order correlation of neutralized submission to target
+        fnc = np.corrcoef(sub.rank(pct=True, method="first"), targets)[0, 1]
+
+        return fnc
+        
     def score_summary(self):
         """
         compute all the metrics for summary
@@ -265,6 +290,10 @@ class TournamentScoring:
             score_df['mmc_mean'], score_df['mmc_std'], score_df['corr_mmc_sharpe'], score_df[f'corr_with_{self.neut_col}'] = self.compute_val_mmc()
         except:
             print('ERR: computing MMC')
+        try:
+            score_df['fnc'] = self.calculate_fnc()
+        except:
+            print('ERR: FNC')
         
         score_df = pd.DataFrame.from_dict(score_df, orient='index').rename(columns={0: 'score'})
         print(score_df.to_markdown(tablefmt='grid'))
