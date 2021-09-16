@@ -1,3 +1,4 @@
+# libraries
 import numpy as np # linear algebra
 import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
 import gc
@@ -30,7 +31,6 @@ style.use('seaborn-colorblind')
 
 import warnings
 warnings.simplefilter('ignore')
-
 
 """Utils
 """
@@ -132,6 +132,32 @@ def hypara_dispatcher(MODEL='LGB'):
             'optimizer': {'type': 'adam', 'lr': 1e-3},
             'batch_size': 1024,
             'epochs': 100
+        }
+
+    elif MODEL == 'ridge':
+        params = {
+            'alpha': 100
+            , 'fit_intercept': True
+            , 'max_iter': 10000
+            , 'random_state': 46
+        }
+
+    elif MODEL == 'beyesianridge':
+        params = {
+            'n_iter': 10000
+        }
+
+    elif MODEL == 'lasso':
+        params = {
+            'alpha': 0.001
+            , 'fit_intercept': True
+            , 'max_iter': 10000
+            , 'random_state': 46
+        }
+
+    elif MODEL == 'svm':
+        params = {
+            'C': 100
         }
     return params
 
