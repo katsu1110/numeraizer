@@ -2,6 +2,15 @@ import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
 
+# visualize
+import matplotlib.pyplot as plt
+import matplotlib.style as style
+from matplotlib import pyplot
+from matplotlib.ticker import ScalarFormatter
+
+import warnings
+warnings.simplefilter('ignore')
+
 class TournamentScoring:
     """
     Scoring Class for Numerai Tournament
@@ -298,3 +307,79 @@ class TournamentScoring:
         score_df = pd.DataFrame.from_dict(score_df, orient='index').rename(columns={0: 'score'})
         print(score_df.to_markdown(tablefmt='grid'))
         return score_df
+
+class SignalsScoring(TournamentScoring):
+    """
+    Scoring Class for Numerai Signals
+
+    :HOW TO USE:
+    # get numerai signal validation data
+    valid_df = tournament.query('data_type == "validation"').reset_index(drop=True)
+
+    # inference with your model
+    valid_df['prediction'] = model.predict(valid_df[features])
+
+    # compute validation scores
+    scorer = TournamentScoring(
+        valid_df
+        , target_name='target'
+        , pred_name='prediction'
+        , era='era'
+        , features=features
+        , neut_col='feature_dexterity7'
+        )
+    score_df = scorer.score_summary() 
+    """
+
+    def __init__(self
+        , valid_df: pd.DataFrame
+        , target_name: str='target'
+        , pred_name: str='prediction'
+        , era: str='era'
+        , features: list=['feature_charisma19', 'feature_strength34']
+        , neut_col: str='feature_dexterity7'
+        ):
+        """
+        :INPUT:
+        - valid_df : validation data (era, target, pred + feature columns)
+        - target_name : target name
+        - pred name : prediction name
+        - era : era name
+        - features : features list
+        - neut_col : str, used for mmc computation (idealy use example prediction)
+        """
+        # test
+        for f in [target_name, pred_name, era, neut_col] + features:
+            assert f in valid_df.columns.values.tolist()
+        
+        # assign
+        self.valid_df = valid_df
+        self.target_name = target_name
+        self.pred_name = pred_name
+        self.era = era
+        self.features = features
+        self.neut_col = neut_col
+
+    def score(df, target_name=target, pred_name='prediction'):
+        '''Takes df and calculates spearm correlation from pre-defined cols'''
+        # method="first" breaks ties based on order in array
+        return np.corrcoef(
+            df[target_name],
+            df[pred_name].rank(pct=True, method="first")
+        )[0,1]
+
+    def run_analytics(era_scores):
+        print(f"Mean Correlation: {era_scores.mean():.4f}")
+        print(f"Median Correlation: {era_scores.median():.4f}")
+        print(f"Standard Deviation: {era_scores.std():.4f}")
+        print('\n')
+        print(f"Mean Pseudo-Sharpe: {era_scores.mean()/era_scores.std():.4f}")
+        print(f"Median Pseudo-Sharpe: {era_scores.median()/era_scores.std():.4f}")
+        print('\n')
+        print(f'Hit Rate (% positive eras): {era_scores.apply(lambda x: np.sign(x)).value_counts()[1]/len(era_scores):.2%}')
+
+        era_scores.rolling(10).mean().plot(kind='line', title='Rolling Per Era Correlation Mean', figsize=(15,4))
+        plt.axhline(y=0.0, color="r", linestyle="--"); plt.show()
+
+        era_scores.cumsum().plot(title='Cumulative Sum of Era Scores', figsize=(15,4))
+        plt.axhline(y=0.0, color="r", linestyle="--"); plt.show()
